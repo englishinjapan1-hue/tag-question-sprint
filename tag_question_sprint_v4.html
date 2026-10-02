@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tag Question Sprint</title>
+<style>
+:root{
+  --bg:#f5f7fb; --card:#fff; --ink:#1f2430; --muted:#697386; --line:#e7ebf2;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:920px;margin:0 auto;padding:24px}
+.card{background:var(--card);border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(31,36,48,.08)}
+h1{margin:0 0 8px;font-size:30px} h2{margin:0 0 12px} h3{margin:20px 0 8px}
+.sub{color:var(--muted);margin-bottom:20px}
+.grid{display:grid;gap:14px}
+.stage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stage{border:1px solid var(--line);border-radius:16px;padding:18px}
+.stage.locked{opacity:.55}
+.stage-title{font-weight:700;font-size:19px}
+.levels{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{font:inherit}
+.btn{border:none;border-radius:12px;padding:12px 16px;cursor:pointer;background:#222;color:#fff}
+.btn.secondary{background:#eef1f6;color:#222}
+.btn.small{padding:9px 12px;font-size:14px}
+.level-btn{border:none;border-radius:999px;padding:9px 12px;background:#eef1f6;cursor:pointer}
+.level-btn.done{outline:2px solid #222}
+.topbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pill{background:#eef1f6;border-radius:999px;padding:8px 12px;font-size:14px}
+.progress{height:8px;background:#edf0f5;border-radius:999px;overflow:hidden}
+.bar{height:100%;width:20%;background:#222;transition:.2s}
+.question{font-size:30px;line-height:1.55;text-align:center;margin:34px 0 24px}
+.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.choice{border:1px solid var(--line);background:#f8f9fc;padding:16px;border-radius:14px;font-size:23px;cursor:pointer}
+.choice.correct{background:#dff4e6}.choice.wrong{background:#fde2e2}
+.input-row{display:flex;gap:10px;justify-content:center}
+input[type=text]{width:min(520px,100%);padding:16px;border:1px solid var(--line);border-radius:12px;font-size:22px}
+.feedback{min-height:30px;text-align:center;margin-top:16px;font-weight:700}
+.hidden{display:none!important}
+.result{text-align:center}
+.big{font-size:52px;font-weight:800;margin:6px 0 18px}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.note{font-size:14px;color:var(--muted)}
+.instructions{line-height:1.7}
+table{width:100%;border-collapse:collapse;margin:12px 0 18px}
+th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}
+.mic{font-size:18px}
+.context{font-size:18px;color:var(--muted);text-align:center;margin-top:-10px}
+@media(max-width:680px){
+ .stage-grid{grid-template-columns:1fr}
+ .question{font-size:24px}
+ .choices{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+
+    <section id="home">
+      <h1>Tag Question Sprint</h1>
+      <div class="sub">90秒で「付加疑問文」を反射にする。</div>
+      <div class="actions" style="justify-content:flex-start;margin-bottom:22px">
+        <button class="btn secondary small" onclick="showInstructions()">遊び方</button>
+        <button class="btn secondary small" onclick="resetProgress()">進捗をリセット</button>
+      </div>
+      <div class="grid stage-grid" id="stageGrid"></div>
+    </section>
+
+    <section id="instructions" class="hidden instructions">
+      <h2>生徒用｜ゲームの遊び方</h2>
+      <p><strong>90秒で、正確に、できるだけたくさん答えよう。</strong></p>
+      <p>3問ごとにあなたの正答率をチェックします。3問全部正解すると問題が難しくなり、0〜1問正解なら少し簡単になります。</p>
+      <table>
+        <tr><th>Stage 1</th><td>主語を正しい代名詞に変える</td></tr>
+        <tr><th>Stage 2</th><td>付加疑問の正しい動詞を作る</td></tr>
+        <tr><th>Stage 3</th><td>動詞＋代名詞を両方作る</td></tr>
+      </table>
+      <table>
+        <tr><th>Level 1</th><td>選択式</td></tr>
+        <tr><th>Level 2</th><td>タイピング</td></tr>
+      </table>
+      <p>結果には <strong>正答数・正答率・最高到達Difficulty</strong> が出ます。速さだけでなく、正確さも大切です。</p>
+            <button class="btn" onclick="showHome()">HOME</button>
+    </section>
+
+    <section id="game" class="hidden">
+      <div class="topbar">
+        <div class="pill" id="modeLabel"></div>
+        <div class="pill">⏱ <span id="time">1:30</span></div>
+        <div class="pill">✓ <span id="correct">0</span></div>
+        <div class="pill">Difficulty <span id="difficulty">1</span></div>
+      </div>
+      <div class="progress"><div class="bar" id="bar"></div></div>
+      <div id="context" class="context"></div>
+      <div id="question" class="question"></div>
+      <div id="answerArea"></div>
+      <div id="feedback" class="feedback"></div>
+    </section>
+
+    <section id="result" class="hidden result">
+      <h2 id="resultTitle">TIME'S UP!</h2>
+      <div class="sub" id="resultMode"></div>
+      <div>Correct</div><div class="big" id="resultCorrect">0</div>
+      <div>Accuracy</div><div class="big"><span id="resultAccuracy">0</span>%</div>
+      <div>Highest Difficulty</div><div class="big" id="resultDifficulty">1</div>
+      <div class="actions">
+        <button class="btn secondary" id="retryBtn" onclick="startGame(currentStage,currentLevel)">RETRY</button>
+        <button class="btn secondary" onclick="showHome()">HOME</button>
+        <button class="btn" id="nextBtn" onclick="nextGame()">NEXT GAME</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+const STAGES = {
+  1:{name:"Pronoun", desc:"主語 → 代名詞"},
+  2:{name:"Tag Verb", desc:"動詞 → 正しいtag verb"},
+  3:{name:"Full Tag", desc:"動詞＋代名詞"}
+};
+const CLEAR_CRITERIA = {
+  "1-1": {correct:20, accuracy:90},
+  "1-2": {correct:12, accuracy:90},
+  "2-1": {correct:18, accuracy:90},
+  "2-2": {correct:12, accuracy:90},
+  "3-1": {correct:15, accuracy:90},
+  "3-2": {correct:10, accuracy:90},
+};
+
+const LEVELS = {
+  1:{name:"Choice"},
+  2:{name:"Typing"}
+};
+const pronouns=["I","you","he","she","it","they"];
+const auxPool=["is","isn’t","are","aren’t","was","wasn’t","were","weren’t","do","don’t","does","doesn’t","did","didn’t","has","hasn’t","have","haven’t","had","hadn’t","will","won’t","can","can’t","could","couldn’t","should","shouldn’t","would","wouldn’t","must","mustn’t"];
+
+let currentStage=1,currentLevel=1;
+let seconds=90, timer=null, correct=0,total=0,difficulty=1,maxDifficulty=1,recent=[];
+let recentKeys=[], locked=false;
+let currentQ=null;
+
+
+const subjects = {
+  male: [
+    {s:"Tom", p:"he", number:"sg", kind:"person"},
+    {s:"Ken", p:"he", number:"sg", kind:"person"},
+    {s:"Mr. Brown", p:"he", number:"sg", kind:"person"},
+    {s:"Your brother", p:"he", number:"sg", kind:"person"},
+    {s:"Your father", p:"he", number:"sg", kind:"person"}
+  ],
+  female: [
+    {s:"Sarah", p:"she", number:"sg", kind:"person"},
+    {s:"Emma", p:"she", number:"sg", kind:"person"},
+    {s:"Mrs. Green", p:"she", number:"sg", kind:"person"},
+    {s:"Your sister", p:"she", number:"sg", kind:"person"},
+    {s:"Your mother", p:"she", number:"sg", kind:"person"}
+  ],
+  peoplePlural: [
+    {s:"The students", p:"they", number:"pl", kind:"people"},
+    {s:"The children", p:"they", number:"pl", kind:"people"},
+    {s:"Your friends", p:"they", number:"pl", kind:"people"},
+    {s:"Tom and Sarah", p:"they", number:"pl", kind:"people"},
+    {s:"The teachers", p:"they", number:"pl", kind:"people"}
+  ],
+  objectSing: [
+    {s:"This computer", p:"it", number:"sg", kind:"object"},
+    {s:"That book", p:"it", number:"sg", kind:"object"},
+    {s:"The machine", p:"it", number:"sg", kind:"object"},
+    {s:"The door", p:"it", number:"sg", kind:"object"},
+    {s:"The new system", p:"it", number:"sg", kind:"object"}
+  ],
+  objectPlural: [
+    {s:"These books", p:"they", number:"pl", kind:"objects"},
+    {s:"Those chairs", p:"they", number:"pl", kind:"objects"},
+    {s:"The lights", p:"they", number:"pl", kind:"objects"},
+    {s:"The computers", p:"they", number:"pl", kind:"objects"},
+    {s:"The windows", p:"they", number:"pl", kind:"objects"}
+  ]
+};
+
+const complexSubjects = [
+  {s:"The boy in the blue jacket", p:"he", number:"sg", kind:"person"},
+  {s:"The girl by the window", p:"she", number:"sg", kind:"person"},
+  {s:"The students in the advanced class", p:"they", number:"pl", kind:"people"},
+  {s:"The books on the top shelf", p:"they", number:"pl", kind:"objects"},
+  {s:"The box of old photos", p:"it", number:"sg", kind:"object"},
+  {s:"The names of the students", p:"they", number:"pl", kind:"objects"},
+  {s:"The students waiting outside", p:"they", number:"pl", kind:"people"},
+  {s:"The man who lives next door", p:"he", number:"sg", kind:"person"},
+  {s:"The books written by this author", p:"they", number:"pl", kind:"objects"},
+  {s:"Reading English books every day", p:"it", number:"sg", kind:"gerund"},
+  {s:"Learning a new language", p:"it", number:"sg", kind:"gerund"},
+  {s:"The idea of studying abroad", p:"it", number:"sg", kind:"idea"}
+];
+
+function rand(a){return a[Math.floor(Math.random()*a.length)]}
+function weighted(items){
+  const total=items.reduce((s,x)=>s+x.w,0), r=Math.random()*total;
+  let acc=0; for(const x of items){acc+=x.w;if(r<=acc)return x.v}
+  return items[items.length-1].v;
+}
+function contraction(aux,negative){
+ const map={
+  is:["is","isn’t"],are:["are","aren’t"],was:["was","wasn’t"],were:["were","weren’t"],
+  do:["do","don’t"],does:["does","doesn’t"],did:["did","didn’t"],
+  has:["has","hasn’t"],have:["have","haven’t"],had:["had","hadn’t"],
+  will:["will","won’t"],can:["can","can’t"],could:["could","couldn’t"],
+  should:["should","shouldn’t"],would:["would","wouldn’t"],must:["must","mustn’t"]
+ };
+ return map[aux][negative?1:0];
+}
+
+function thirdPersonSingular(base){
+  const irregular={have:"has",do:"does",go:"goes"};
+  if(irregular[base]) return irregular[base];
+  if(/[^aeiou]y$/.test(base)) return base.slice(0,-1)+"ies";
+  if(/(s|sh|ch|x|z|o)$/.test(base)) return base+"es";
+  return base+"s";
+}
+
+function pastForm(base){
+  const irregular={
+    be:"was",have:"had",go:"went",come:"came",meet:"met",take:"took",
+    make:"made",leave:"left",see:"saw",write:"wrote",read:"read"
+  };
+  if(irregular[base]) return irregular[base];
+  if(/e$/.test(base)) return base+"d";
+  if(/[^aeiou]y$/.test(base)) return base.slice(0,-1)+"ied";
+  return base+"ed";
+}
+
+function chooseSubject(diff){
+  const r=Math.random();
+  if(r<0.02) return {s:"I",p:"I",number:"sg",kind:"I"};
+  if(diff>=4 && r<0.22) return {...rand(complexSubjects)};
+
+  const group=weighted([
+    {v:"male",w:18},{v:"female",w:18},{v:"peoplePlural",w:24},
+    {v:"objectSing",w:18},{v:"objectPlural",w:18},{v:"you",w:4}
+  ]);
+  if(group==="you") return {s:"You",p:"you",number:"pl",kind:"you"};
+  return {...rand(subjects[group])};
+}
+
+function finitePresent(base, subj){
+  if(subj.p==="he" || subj.p==="she" || subj.p==="it") return thirdPersonSingular(base);
+  return base;
+}
+
+function bePresent(subj){
+  if(subj.p==="I") return "am";
+  return subj.number==="pl" ? "are" : "is";
+}
+function bePast(subj){
+  return subj.number==="pl" ? "were" : "was";
+}
+function havePresent(subj){
+  return (subj.p==="he" || subj.p==="she" || subj.p==="it") ? "has" : "have";
+}
+function doPresent(subj){
+  return (subj.p==="he" || subj.p==="she" || subj.p==="it") ? "does" : "do";
+}
+
+function makeSimpleVerbPredicate(subj, base, rest){
+  const verb=finitePresent(base,subj);
+  return {body:`${verb}${rest}`, aux:doPresent(subj), positive:true, type:"lexical", base, rest};
+}
+function makePastVerbPredicate(subj, base, rest){
+  return {body:`${pastForm(base)}${rest}`, aux:"did", positive:true, type:"lexicalPast", base, rest};
+}
+
+function makePredicate(subj,diff){
+  const t=subj.kind;
+  if(t==="I"){
+    return rand([
+      {body:"am next on the list",aux:"am",tagAux:"aren’t",positive:true,type:"be"},
+      {body:"am supposed to bring an ID",aux:"am",tagAux:"aren’t",positive:true,type:"be"},
+      {body:"am allowed to park here",aux:"am",tagAux:"aren’t",positive:true,type:"be"}
+    ]);
+  }
+
+  const be=bePresent(subj), pastBe=bePast(subj), have=havePresent(subj);
+  let candidates=[];
+
+  if(["person","people","you"].includes(t)){
+    candidates.push(
+      {body:`${be} ready`,aux:be,positive:true,type:"be"},
+      {body:`${be} busy today`,aux:be,positive:true,type:"be"},
+      {body:`${pastBe} at the meeting yesterday`,aux:pastBe,positive:true,type:"be"},
+      {body:"can drive",aux:"can",positive:true,type:"modal"},
+      {body:"will come tomorrow",aux:"will",positive:true,type:"modal"},
+      makeSimpleVerbPredicate(subj,"work"," at the hospital"),
+      makePastVerbPredicate(subj,"study"," for the test")
+    );
+    if(diff>=2){
+      candidates.push(
+        {body:`${be} going to leave soon`,aux:be,positive:true,type:"be"},
+        {body:"should be ready by noon",aux:"should",positive:true,type:"modal"},
+        {body:"could arrive later",aux:"could",positive:true,type:"modal"}
+      );
+    }
+    if(diff>=3){
+      candidates.push(
+        {body:`${be} waiting outside`,aux:be,positive:true,type:"be"},
+        {body:`${pastBe} working yesterday afternoon`,aux:pastBe,positive:true,type:"be"}
+      );
+    }
+    if(diff>=4){
+      candidates.push(
+        {body:`${have} finished the work already`,aux:have,positive:true,type:"have"},
+        {body:"had left before noon",aux:"had",positive:true,type:"have"}
+      );
+    }
+    if(diff>=5){
+      candidates.push(
+        {body:`${have} been waiting for a while`,aux:have,positive:true,type:"have"},
+        {body:"had been working for two hours",aux:"had",positive:true,type:"have"}
+      );
+    }
+  }
+
+  if(["object","objects"].includes(t)){
+    candidates.push(
+      {body:`${be} useful`,aux:be,positive:true,type:"be"},
+      {body:`${be} still open`,aux:be,positive:true,type:"be"},
+      {body:`${pastBe} here yesterday`,aux:pastBe,positive:true,type:"be"}
+    );
+    if(diff>=2){
+      candidates.push(
+        {body:`${be} going to be replaced soon`,aux:be,positive:true,type:"be"},
+        {body:"should be ready by noon",aux:"should",positive:true,type:"modal"},
+        {body:"could be useful later",aux:"could",positive:true,type:"modal"}
+      );
+    }
+    if(diff>=3){
+      candidates.push(
+        {body:`${be} working properly`,aux:be,positive:true,type:"be"},
+        {body:`${pastBe} working yesterday afternoon`,aux:pastBe,positive:true,type:"be"}
+      );
+    }
+    if(diff>=4){
+      candidates.push(
+        {body:`${have} been checked already`,aux:have,positive:true,type:"have"},
+        {body:"had been moved before noon",aux:"had",positive:true,type:"have"}
+      );
+    }
+  }
+
+  if(t==="gerund"){
+    candidates=[
+      makeSimpleVerbPredicate(subj,"take"," time"),
+      makeSimpleVerbPredicate(subj,"require"," practice"),
+      {body:`${be} useful`,aux:be,positive:true,type:"be"}
+    ];
+  }
+  if(t==="idea"){
+    candidates=[
+      makeSimpleVerbPredicate(subj,"sound"," exciting"),
+      {body:`${be} interesting`,aux:be,positive:true,type:"be"}
+    ];
+  }
+
+  let pred=rand(candidates);
+
+  if(Math.random()<0.5 && pred.aux!=="am"){
+    const negMap={
+      is:"isn’t",are:"aren’t",was:"wasn’t",were:"weren’t",
+      do:"don’t",does:"doesn’t",did:"didn’t",
+      has:"hasn’t",have:"haven’t",had:"hadn’t",
+      will:"won’t",can:"can’t",could:"couldn’t",should:"shouldn’t",
+      would:"wouldn’t",must:"mustn’t"
+    };
+    if(pred.type==="lexical"){
+      pred={...pred,body:`${negMap[pred.aux]} ${pred.base}${pred.rest}`,positive:false};
+    }else if(pred.type==="lexicalPast"){
+      pred={...pred,body:`didn’t ${pred.base}${pred.rest}`,positive:false};
+    }else{
+      pred={...pred,body:pred.body.replace(new RegExp("^"+pred.aux+"\\b"),negMap[pred.aux]),positive:false};
+    }
+  }
+  return pred;
+}
+
+function tagAuxFor(pred, subj){
+  if(subj.type==="I") return pred.tagAux;
+  return contraction(pred.aux, pred.positive); // positive statement -> negative tag; negative -> positive
+}
+
+function generateQuestion(){
+  let attempts=0;
+  while(attempts++<80){
+    const subj=chooseSubject(difficulty);
+    const pred=makePredicate(subj,difficulty);
+    const tagAux=tagAuxFor(pred,subj);
+    const key=`${subj.s}|${pred.body}|${tagAux}|${subj.p}`;
+    if(!recentKeys.includes(key)){
+      recentKeys.push(key); if(recentKeys.length>12) recentKeys.shift();
+      return {subj,pred,tagAux,key};
+    }
+  }
+  const subj=chooseSubject(difficulty), pred=makePredicate(subj,difficulty);
+  return {subj,pred,tagAux:tagAuxFor(pred,subj),key:"fallback"};
+}
+
+function stageQuestion(q){
+  const full=`${q.subj.s} ${q.pred.body}`;
+  if(currentStage===1) return {prompt:`${full}, ${q.tagAux} ___?`, answer:q.subj.p};
+  if(currentStage===2) return {prompt:`${full}, ___ ${q.subj.p}?`, answer:q.tagAux};
+  return {prompt:`${full}, ________?`, answer:`${q.tagAux} ${q.subj.p}`};
+}
+
+function normalize(s){
+ return s.toLowerCase().trim()
+  .replace(/[?.,!]/g,"")
+  .replace(/[’]/g,"'")
+  .replace(/\s+/g," ");
+}
+
+function renderHome(){
+ const progress=JSON.parse(localStorage.getItem("tqProgress")||"{}");
+ const grid=document.getElementById("stageGrid");
+ grid.innerHTML="";
+ Object.keys(STAGES).forEach(sk=>{
+  const s=+sk;
+  const div=document.createElement("div"); div.className="stage";
+  div.innerHTML=`<div class="stage-title">Stage ${s}｜${STAGES[s].name}</div>
+  <div class="sub" style="margin:4px 0 8px">${STAGES[s].desc}</div>
+  <div class="levels"></div>`;
+  const levels=div.querySelector(".levels");
+  [1,2].forEach(l=>{
+    const b=document.createElement("button");
+    b.className="level-btn"+(progress[`${s}-${l}`]?.cleared?" done":"");
+    b.textContent=`Level ${l}｜${LEVELS[l].name}`;
+    b.onclick=()=>startGame(s,l);
+    levels.appendChild(b);
+  });
+  grid.appendChild(div);
+ });
+}
+
+function showHome(){
+ clearInterval(timer);
+ document.querySelectorAll("section").forEach(x=>x.classList.add("hidden"));
+ document.getElementById("home").classList.remove("hidden");
+ renderHome();
+}
+function showInstructions(){
+ document.querySelectorAll("section").forEach(x=>x.classList.add("hidden"));
+ document.getElementById("instructions").classList.remove("hidden");
+}
+function resetProgress(){
+ localStorage.removeItem("tqProgress"); renderHome();
+}
+
+function updateHud(){
+ const m=Math.floor(seconds/60),s=seconds%60;
+ document.getElementById("time").textContent=`${m}:${String(s).padStart(2,"0")}`;
+ document.getElementById("correct").textContent=correct;
+ document.getElementById("difficulty").textContent=difficulty;
+ document.getElementById("bar").style.width=`${difficulty*20}%`;
+}
+
+function startGame(stage,level){
+ currentStage=stage; currentLevel=level;
+ seconds=90;correct=0;total=0;difficulty=1;maxDifficulty=1;recent=[];recentKeys=[];locked=false;
+ document.querySelectorAll("section").forEach(x=>x.classList.add("hidden"));
+ document.getElementById("game").classList.remove("hidden");
+ document.getElementById("modeLabel").textContent=`Stage ${stage} / Level ${level}`;
+ updateHud(); nextQuestion();
+ clearInterval(timer);
+ timer=setInterval(()=>{seconds--;updateHud();if(seconds<=0)endGame()},1000);
+}
+
+function nextQuestion(){
+ locked=false;document.getElementById("feedback").textContent="";
+ currentQ=generateQuestion();
+ const sq=stageQuestion(currentQ);
+ document.getElementById("question").textContent=sq.prompt;
+ document.getElementById("context").textContent=sq.context||"";
+ renderAnswerArea(sq.answer);
+}
+
+function renderAnswerArea(answer){
+ const area=document.getElementById("answerArea"); area.innerHTML="";
+ if(currentLevel===1){
+   let opts;
+   if(currentStage===1){
+      const distractors = shuffleUnique(pronouns.filter(x=>x!==answer)).slice(0,3);
+      opts = shuffleUnique([answer,...distractors]);
+   } else if(currentStage===2){
+      const distractors = shuffleUnique(auxPool.filter(x=>x!==answer)).slice(0,3);
+      opts = shuffleUnique([answer,...distractors]);
+   } else {
+      opts = makeFullTagChoices(answer);
+   }
+   const wrap=document.createElement("div");wrap.className="choices";
+   opts.forEach(opt=>{
+     const b=document.createElement("button");b.className="choice";b.textContent=opt;
+     b.onclick=()=>submitAnswer(opt,answer,b);wrap.appendChild(b);
+   });area.appendChild(wrap);
+ } else {
+   const row=document.createElement("div");row.className="input-row";
+   const inp=document.createElement("input");inp.type="text";inp.placeholder="Type your answer";
+   const btn=document.createElement("button");btn.className="btn";btn.textContent="ENTER";
+   btn.onclick=()=>submitAnswer(inp.value,answer,null);
+   inp.addEventListener("keydown",e=>{if(e.key==="Enter")submitAnswer(inp.value,answer,null)});
+   row.append(inp,btn);area.appendChild(row);setTimeout(()=>inp.focus(),50);
+ }
+}
+
+function shuffleUnique(arr){
+ const a=[...new Set(arr)];
+ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+ return a;
+}
+function makeFullTagChoices(answer){
+ const [aux,pro]=answer.split(" ");
+ const wrongPros=pronouns.filter(x=>x!==pro);
+ const wrongAux=auxPool.filter(x=>x!==aux);
+ const distractors = shuffleUnique([
+   `${aux} ${rand(wrongPros)}`,
+   `${rand(wrongAux)} ${pro}`,
+   `${rand(wrongAux)} ${rand(wrongPros)}`,
+   `${rand(wrongAux)} ${rand(wrongPros)}`
+ ]).filter(x=>x!==answer).slice(0,3);
+ return shuffleUnique([answer,...distractors]);
+}
+
+function submitAnswer(given,answer,btn){
+ if(locked)return;locked=true;total++;
+ const ok=normalize(given)===normalize(answer);
+ recent.push(ok?1:0);
+ if(ok){correct++;if(btn)btn.classList.add("correct");document.getElementById("feedback").textContent="✓";}
+ else{
+   if(btn)btn.classList.add("wrong");
+   document.getElementById("feedback").textContent=`Correct: ${answer}`;
+ }
+ if(recent.length===3){
+   const hits=recent.reduce((a,b)=>a+b,0);
+   if(hits===3 && difficulty<5){
+     difficulty++;maxDifficulty=Math.max(maxDifficulty,difficulty);
+     document.getElementById("feedback").textContent="LEVEL UP!";
+   } else if(hits<=1 && difficulty>1){
+     difficulty--;
+     document.getElementById("feedback").textContent="LEVEL DOWN";
+   }
+   recent=[];
+ }
+ updateHud();setTimeout(nextQuestion,700);
+}
+
+
+function nextGame(){
+  let nextStage = currentStage;
+  let nextLevel = currentLevel + 1;
+
+  if(nextLevel > 2){
+    nextLevel = 1;
+    nextStage = currentStage + 1;
+  }
+
+  if(nextStage > 3){
+    nextStage = 1;
+    nextLevel = 1;
+  }
+
+  startGame(nextStage, nextLevel);
+}
+
+function endGame(){
+ clearInterval(timer);
+ document.getElementById("game").classList.add("hidden");
+ document.getElementById("result").classList.remove("hidden");
+ const key=`${currentStage}-${currentLevel}`;
+ const crit=CLEAR_CRITERIA[key];
+ document.getElementById("resultMode").textContent=`Stage ${currentStage} / Level ${currentLevel}  •  Clear: ${crit.correct}+ correct / ${crit.accuracy}%+`;
+ document.getElementById("resultCorrect").textContent=correct;
+ const acc=total?Math.round(correct/total*100):0;
+ document.getElementById("resultAccuracy").textContent=acc;
+ document.getElementById("resultDifficulty").textContent=maxDifficulty;
+
+ const cleared = correct>=crit.correct && acc>=crit.accuracy;
+
+ document.getElementById("resultTitle").textContent = cleared ? "LEVEL CLEAR!" : "TRY AGAIN!";
+ document.getElementById("nextBtn").classList.toggle("hidden", !cleared);
+ document.getElementById("retryBtn").classList.toggle("hidden", cleared);
+
+ const progress=JSON.parse(localStorage.getItem("tqProgress")||"{}");
+ progress[key]={
+   bestCorrect:Math.max(progress[key]?.bestCorrect||0,correct),
+   bestAccuracy:Math.max(progress[key]?.bestAccuracy||0,acc),
+   maxDifficulty:Math.max(progress[key]?.maxDifficulty||1,maxDifficulty),
+   cleared: Boolean(progress[key]?.cleared || cleared)
+ };
+ localStorage.setItem("tqProgress",JSON.stringify(progress));
+}
+
+renderHome();
+</script>
+</body>
+</html>
